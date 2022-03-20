@@ -5,6 +5,7 @@ import struct
 import time
 import select
 import binascii
+
 # Should use stdev
 
 ICMP_ECHO_REQUEST = 8
@@ -33,7 +34,6 @@ def checksum(string):
     return answer
 
 
-
 def receiveOnePing(mySocket, ID, timeout, destAddr):
     timeLeft = timeout
 
@@ -47,11 +47,18 @@ def receiveOnePing(mySocket, ID, timeout, destAddr):
         timeReceived = time.time()
         recPacket, addr = mySocket.recvfrom(1024)
 
-        # Fill in start
+        icmph = recPacket[20:28]
+        type, code, checksum, pID, sq = struct.unpack("bbHHh", icmph)
 
-        # Fetch the ICMP header from the IP packet
+        #print ("The header received in the ICMP reply is ", type, code, checksum, pID, sq)
+        if pID == ID:
+            bytesinDb = struct.calcsize("d")
+            timeSent = struct.unpack("d", recPacket[28:28 + bytesinDb])[0]
+            rtt = timeReceived - timeSent
 
-        # Fill in end
+            #print ("Round trip time is : ", rtt)
+            return rtt
+
         timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
             return "Request timed out."
@@ -76,19 +83,17 @@ def sendOnePing(mySocket, destAddr, ID):
     else:
         myChecksum = htons(myChecksum)
 
-
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, 1)
     packet = header + data
 
     mySocket.sendto(packet, (destAddr, 1))  # AF_INET address must be tuple, not str
 
-
     # Both LISTS and TUPLES consist of a number of objects
     # which can be referenced by their position number within the object.
 
+
 def doOnePing(destAddr, timeout):
     icmp = getprotobyname("icmp")
-
 
     # SOCK_RAW is a powerful socket type. For more details:   http://sockraw.org/papers/sock_raw
     mySocket = socket(AF_INET, SOCK_RAW, icmp)
@@ -108,12 +113,16 @@ def ping(host, timeout=1):
     # Calculate vars values and return them
     #  vars = [str(round(packet_min, 2)), str(round(packet_avg, 2)), str(round(packet_max, 2)),str(round(stdev(stdev_var), 2))]
     # Send ping requests to a server separated by approximately one second
-    for i in range(0,4):
+    for i in range(0, 4):
         delay = doOnePing(dest, timeout)
         print(delay)
         time.sleep(1)  # one second
 
-    return vars
+    return delay
+
 
 if __name__ == '__main__':
-    ping("google.co.il")
+    #ping("google.co.il")
+    ping("127.0.0.1")
+
+    #ping("www.google.com")
